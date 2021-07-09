@@ -3,6 +3,22 @@ from scipy.linalg import expm
 from typing import List
 from .krr import krr_energy
 
+def update_Ftrans(nel,eads,Fs,dR,Ftrans):
+  """
+  """
+  count = 0
+  for i in range(nel-1):
+    for j in range(i+1,nel):
+      Ftrans[i,j] += 0.5 * np.sum(Fs[count]*dR) / (eads[j]-eads[i])
+      count += 1
+
+def antihermitize(nel,F):
+  """
+  """
+  for i in range(nel-1):
+    for j in range(i+1,nel):
+      F[j,i] = -F[i,j]
+
 def compute_cmat(ind0: int,
                  indf: int,
                  nel: int,
@@ -52,7 +68,7 @@ def compute_cmat(ind0: int,
     count = 0
     for i in range(nel-1):
       for j in range(i+1,nel):
-        Ftrans[i,j] += 0.5*np.sum((Fprev[count] + Fnext)*(geoms[indf]-geoms[ind0]))
+        Ftrans[i,j] += 0.5*np.sum((Fprev[count] + Fnext[count])*(geoms[indf]-geoms[ind0]))
         Ftrans[j,i] = -Ftrans[i,j]
         count += 1
 
@@ -125,12 +141,13 @@ def compute_cmat_krr(ind0: int,
     Fnext = Fs[indf].copy()
 
     # compute phase information
-    sgn = np.sum((Fprev*Fnext))
-    if sgn < 0.0:
-      Fnext *= -1.0
+    for i in range(int((nel*nel-nel)/2)):
+      sgn = np.sum((Fprev[i]*Fnext[i]))
+      if sgn < 0.0:
+        Fnext[i] *= -1.0
 
     # prep line integral
-    Ftrans = np.zeros((2,2))
+    Ftrans = np.zeros((nel,nel))
 
     # starting positions of integral
     Rnm = modes[:,ind0].copy()
@@ -143,25 +160,24 @@ def compute_cmat_krr(ind0: int,
     # trapezoid rule integration
     for j in range(nsteps):
       if j==0:
-        eapprox =  eads[ind0]#krr_energy(nmodes,alpha,Rnm,modes,modetypes,krr_weights)
-        Fapprox = 0.5 * Fprev / (eapprox[1]-eapprox[0])
+        eapprox = eads[ind0]
       elif j==nsteps-1:
-        eapprox =  eads[indf]#krr_energy(nmodes,alpha,Rnm,modes,modetypes,krr_weights)
-        Fapprox = 0.5 * Fnext / (eapprox[1]-eapprox[0])
+        eapprox = eads[indf]
       else:
         # compute adiabatic energies from krr
-        eapprox = krr_energy(nmodes,alpha,Rnm,modes,modetypes,krr_weights)
-        Fapprox = Fprev / (eapprox[1]-eapprox[0])
-      Ftrans[0,1] += np.sum(Fapprox*dR)
+        eapprox = 0.5*krr_energy(nmodes,alpha,Rnm,modes,modetypes,krr_weights)
+      update_Ftrans(nel,eapprox,Fprev,dR,Ftrans)
       Rnm += dRnm
       Fprev += dF
-    # antihermitize
-    Ftrans[1,0] = -Ftrans[0,1]
+    antihermitize(nel,Ftrans)
 
-    # make symmetric propagator
-    CpropR = expm(-0.5*Ftrans)
-    CpropL = expm(0.5*Ftrans)
-    Cprop = np.dot(np.linalg.inv(CpropL),CpropR)
+    try:
+      # make symmetric propagator
+      CpropR = expm(-0.5*Ftrans)
+      CpropL = expm(0.5*Ftrans)
+      Cprop = np.dot(np.linalg.inv(CpropL),CpropR)
+    except:
+      print(Ftrans,CpropR,CpropL)
 
     # propagate
     Cmats[indf] = np.dot(Cprop,Cmats[ind0])
