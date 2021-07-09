@@ -1,4 +1,5 @@
 import numpy as np
+from time import time
 from typing import List, Optional
 from .compute_path import mintree
 from .krr import make_krr_weights
@@ -16,7 +17,7 @@ def diabatize(nel: int,
   energies and derivative couplings using propagation diabatization.
   """
 
-  # do some checks about the order of things
+  # TODO do some checks about the order of things
 
   # compute nearest-neighbor path
   nns = mintree(ngeoms, geoms)
@@ -25,8 +26,12 @@ def diabatize(nel: int,
   Cmats = np.zeros((ngeoms,nel,nel))
   Cmats[0] = np.eye(nel)
 
+  if ngeoms>10:
+    every = int(ngeoms/10)
+  else:
+    every = 1
+
   if krrflag:
-    #raise NotImplementedError
     # do diabatization with krr
     nmodes = krrargs[0]
     modes  = krrargs[1]
@@ -49,14 +54,22 @@ def diabatize(nel: int,
     krr_weights = make_krr_weights(nel,nmodes,ngeoms,modes,eads,alpha,gam,modetypes)
 
     # do diabatization
+    btime = time()
     for i in range(1,ngeoms):
+      if i%every==0:
+        rtime = time()-btime
+        print('%d Percent done.........%.3f'%((i/every)*10,rtime))
       compute_cmat_krr(nns[i], i, nel, nmodes, nns, Cmats, geoms, eads, Fs,
                        nsteps, modes, modetypes, alpha, krr_weights)
 
   else:
 
     # do diabatization without krr
+    btime = time()
     for i in range(1,ngeoms):
+      if i%every==0:
+        rtime = time()-btime
+        print('%d Percent done.........%.3f'%((i/every)*10,rtime))
       compute_cmat(nns[i], i, nel, nns, Cmats, geoms, eads, Fs)
   
   # output stuff
@@ -75,15 +88,19 @@ def diabatize(nel: int,
     # transform adiabatic potential to diabatic
     vmat = np.dot(Cmats[i].T, np.dot(np.diag(np.array([eads[i,j] for j in range(nel)])), Cmats[i]))
     # write diabatic energies
-    f.write('#Record No. : %d\n'%(i+1))
-    f.write('%.8f '%(vmat[0,0]))
-    f.write('%.8f '%(vmat[0,1]))
-    f.write('%.8f\n'%(vmat[1,1]))
+    f.write('#Geometry %d\n'%(i+1))
+    for j in range(nel):
+      for k in range(j,nel):
+        f.write('%.8f '%(vmat[j,k]))
+    f.write('\n')
     f.flush()
     # write transformation matrix
-    fmat.write('#Record No. : %d\n'%(i+1))
-    fmat.write('%.8f %.8f\n'%(Cmats[i,0,0],Cmats[i,0,1]))
-    fmat.write('%.8f %.8f\n'%(Cmats[i,1,0],Cmats[i,1,1]))
+    fmat.write('#Geometry %d\n'%(i+1))
+    for j in range(nel):
+      for k in range(nel):
+        fmat.write('%.8f '%(Cmats[i,j,k]))
+      fmat.write('\n')
+    fmat.write('\n')
     fmat.flush()
   f.close()
   fmat.close()
