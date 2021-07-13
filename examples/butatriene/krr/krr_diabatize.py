@@ -32,7 +32,7 @@ if __name__ == "__main__":
   
   # get nonadiabatic couplings
   f = open('nact.dba','r')
-  Fs = np.zeros(ngeoms, dtype=np.ndarray)
+  Fs = np.zeros((ngeoms,1), dtype=np.ndarray)
   for i in range(ngeoms):
     F = np.zeros((8,3))
     f.readline()
@@ -41,7 +41,7 @@ if __name__ == "__main__":
       F[j,0] = float(line[0])
       F[j,1] = float(line[1])
       F[j,2] = float(line[2])
-    Fs[i] = F
+    Fs[i,0] = F
   f.close()
   
   # get geometries
