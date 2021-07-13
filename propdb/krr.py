@@ -36,8 +36,8 @@ def make_gweights_mat(nmodes: int,
 
 def make_vkrr(nmodes: int,
               ngeoms: int,
-              alpha: float,
               modes: np.ndarray,
+              alpha: float,
               modetypes: List[str],
               krr_weights: np.ndarray) -> np.ndarray:
   """Computes the energy at all points from kernel ridge regression potential 
